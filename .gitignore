@@ -1,7 +1,14 @@
+# modules
 node_modules
 
+# Prisma generated
+node_modules/.prisma
+node_modules/@prisma/client
+
+# Local DBs
+prisma/*.db
+prisma/*.db-journal
+
+# Env
 .env
 /config/env.js
-
-/generated/prisma
-/generated/prisma
