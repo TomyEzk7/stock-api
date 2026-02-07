@@ -1,0 +1,248 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// AUTENTICACIÓN Y USUARIOS
+// ============================================
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  email     String?  @unique
+  role      Role     @default(VENDEDOR)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relaciones
+  sales     Sale[]
+  payments  Payment[]
+}
+
+enum Role {
+  ADMIN
+  VENDEDOR
+  CAJERO
+}
+
+// ============================================
+// CLIENTES
+// ============================================
+
+model Customer {
+  id             Int      @id @default(autoincrement())
+  name           String
+  lastName       String?
+  businessName   String?  // Razón social (si es empresa)
+  documentType   String   // DNI, CUIT, etc.
+  documentNumber String   @unique
+  email          String?
+  phone          String?
+  address        String?
+  city           String?
+  province       String?
+  postalCode     String?
+  isActive       Boolean  @default(true)
+  creditLimit    Float    @default(0)  // Límite de crédito
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  // Relaciones
+  sales          Sale[]
+  currentAccount CurrentAccount?
+  payments       Payment[]
+}
+
+// ============================================
+// PRODUCTOS Y CATEGORÍAS
+// ============================================
+
+model Category {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  
+  // Relaciones
+  products    Product[]
+}
+
+model Product {
+  id              Int      @id @default(autoincrement())
+  code            String   @unique  // Código de barras o SKU
+  name            String
+  description     String?
+  costPrice       Float    // Precio de costo
+  salePrice       Float    // Precio de venta
+  stock           Int      @default(0)
+  minStock        Int      @default(0)  // Stock mínimo para alertas
+  categoryId      Int
+  supplierId      Int?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relaciones
+  category        Category @relation(fields: [categoryId], references: [id])
+  supplier        Supplier? @relation(fields: [supplierId], references: [id])
+  saleItems       SaleItem[]
+  stockMovements  StockMovement[]
+}
+
+// ============================================
+// PROVEEDORES
+// ============================================
+
+model Supplier {
+  id             Int      @id @default(autoincrement())
+  name           String
+  businessName   String?
+  documentNumber String?  @unique
+  email          String?
+  phone          String?
+  address        String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  // Relaciones
+  products       Product[]
+}
+
+// ============================================
+// VENTAS / PEDIDOS
+// ============================================
+
+model Sale {
+  id              Int          @id @default(autoincrement())
+  saleNumber      String       @unique  // Número de factura/ticket
+  customerId      Int
+  userId          Int
+  saleType        SaleType     @default(CONTADO)
+  paymentMethod   PaymentMethod @default(EFECTIVO)
+  subtotal        Float
+  discount        Float        @default(0)
+  tax             Float        @default(0)  // IVA u otros impuestos
+  total           Float
+  status          SaleStatus   @default(PENDING)
+  notes           String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  
+  // Relaciones
+  customer        Customer     @relation(fields: [customerId], references: [id])
+  user            User         @relation(fields: [userId], references: [id])
+  items           SaleItem[]
+  payments        Payment[]
+}
+
+model SaleItem {
+  id         Int      @id @default(autoincrement())
+  saleId     Int
+  productId  Int
+  quantity   Int
+  unitPrice  Float    // Precio al momento de la venta
+  discount   Float    @default(0)
+  subtotal   Float    // quantity * unitPrice - discount
+  
+  // Relaciones
+  sale       Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id])
+}
+
+enum SaleType {
+  CONTADO      // Pago inmediato
+  CUENTA_CORRIENTE  // A crédito
+}
+
+enum PaymentMethod {
+  EFECTIVO
+  TARJETA_DEBITO
+  TARJETA_CREDITO
+  TRANSFERENCIA
+  CHEQUE
+  MIXTO
+}
+
+enum SaleStatus {
+  PENDING      // Pendiente
+  COMPLETED    // Completada
+  CANCELLED    // Cancelada
+  PARTIAL      // Parcialmente pagada (cuenta corriente)
+}
+
+// ============================================
+// CUENTA CORRIENTE
+// ============================================
+
+model CurrentAccount {
+  id         Int      @id @default(autoincrement())
+  customerId Int      @unique
+  balance    Float    @default(0)  // Saldo actual (positivo = debe, negativo = a favor)
+  creditUsed Float    @default(0)  // Crédito utilizado
+  lastUpdate DateTime @updatedAt
+  
+  // Relaciones
+  customer   Customer @relation(fields: [customerId], references: [id])
+}
+
+// ============================================
+// PAGOS
+// ============================================
+
+model Payment {
+  id             Int           @id @default(autoincrement())
+  customerId     Int
+  saleId         Int?          // Null si es pago a cuenta sin venta específica
+  userId         Int
+  paymentMethod  PaymentMethod
+  amount         Float
+  receiptNumber  String?       // Número de recibo
+  notes          String?
+  createdAt      DateTime      @default(now())
+  
+  // Relaciones
+  customer       Customer      @relation(fields: [customerId], references: [id])
+  sale           Sale?         @relation(fields: [saleId], references: [id])
+  user           User          @relation(fields: [userId], references: [id])
+}
+
+// ============================================
+// MOVIMIENTOS DE STOCK
+// ============================================
+
+model StockMovement {
+  id           Int              @id @default(autoincrement())
+  productId    Int
+  movementType StockMovementType
+  quantity     Int              // Positivo = ingreso, Negativo = egreso
+  reason       String?          // Motivo del movimiento
+  reference    String?          // Referencia (ej: número de venta, compra)
+  createdAt    DateTime         @default(now())
+  
+  // Relaciones
+  product      Product          @relation(fields: [productId], references: [id])
+}
+
+enum StockMovementType {
+  COMPRA           // Entrada por compra a proveedor
+  VENTA            // Salida por venta
+  AJUSTE_POSITIVO  // Ajuste manual (suma)
+  AJUSTE_NEGATIVO  // Ajuste manual (resta)
+  DEVOLUCION       // Devolución de cliente
+  MERMA            // Pérdida/robo/vencimiento
+}
+
+
