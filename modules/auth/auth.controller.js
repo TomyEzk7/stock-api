@@ -1,3 +1,5 @@
+import { authService } from './auth.service.js';
+
 export const authController = {
     // REGISTRO DE USUARIO
     async register(req, res) {
@@ -53,13 +55,15 @@ export const authController = {
                 });
             }
 
-            const user = await authService.login(username, password);
+            const { user, token } = await authService.login(username, password);
 
             return res.json({
                 ok: true, 
                 message: 'Logged in successfully',
-                user
+                user,
+                token
             });
+            
 
         } catch (err) {
             console.log('Login error:', err);

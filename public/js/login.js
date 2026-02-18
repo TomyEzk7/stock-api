@@ -14,13 +14,40 @@ loginBtn.addEventListener('click', async (e) => {
     await handleLogin();
 });
 
+// funcion para recuperar jwt de localStorage y pasarlo en cada req
+// en las llamadas definir METHOD (a menos que sea GET que viene por defecto)
+async function authFetch(url, options = {}) {
+    const token = localStorage.getItem('token');
+
+    return fetch(url, {
+        ...options, 
+        headers: {
+            'Content-Type': 'application/json', 
+            'Authorization': `Bearer ${token}`,
+            ...options.headers
+        }
+    });
+}
+
+// funcion para mostrar el mensaje que devuelva el servidor 
+function showMessage(message) {
+    const messageContainer = document.getElementById('message');
+    
+    messageContainer.textContent = message;
+
+    setTimeout(() => {
+        messageContainer.textContent = '';
+    }, 2000);
+}
+
 async function handleRegister() {
     try {
         const username = document.getElementById('user').value.trim();
         const password = document.getElementById('password').value;
 
+
         if (!username || !password) {
-            alert('Missing fields');
+            showMessage('Please enter both username and password', 'error');
             return;
         }
 
@@ -29,24 +56,23 @@ async function handleRegister() {
             password
         };
 
-        const response = await fetch('/auth/register', {
+        const response = await authFetch('/auth/register', {
             method: 'POST', 
-            headers: {
-                'Content-Type': 'application/json'
-            }, 
             body: JSON.stringify(userData)
         });
 
         const data = await response.json();
 
         if (response.ok) {
-            alert ('User registered!');
+            showMessage('Registration successful!', 'success');
             form.reset();
+                
         } else {
-            alert ('Error:' + (data.error || 'Register error'));
+            showMessage(data.error || 'Registration failed', 'error');
         }
     } catch (err) {
         console.log('Register error:' + err);
+        showMessage('An error occurred during registration', 'error');
     }
 }
 
@@ -56,7 +82,7 @@ async function handleLogin() {
         const password = document.getElementById('password').value;
 
         if (!username || !password) {
-            alert('Missing fields');
+            showMessage(`Please enter both username and password`,'error');
             return;
         }
 
@@ -65,26 +91,24 @@ async function handleLogin() {
             password
         };
 
-        const response = await fetch('/auth/login', {
+        const response = await authFetch('/auth/login', {
             method: 'POST', 
-            headers: {
-                'Content-Type': 'application/json'
-            },
             body: JSON.stringify(credentials)
         });
 
         const data = await response.json();
 
         if (response.ok) {
-            alert(data.message); 
-
             localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('token', data.token);
 
             window.location.href = '/index.html'
         } else {
-            alert('Login error:', data.error);
+            showMessage(data.error || 'Login failed', 'error');
         }
     } catch (err) {
         console.log('Login error:', err);
+        showMessage('An error occurred during login', 'error');
     }
 }
+
